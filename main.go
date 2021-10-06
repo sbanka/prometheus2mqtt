@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/krzysztof-gzocha/prometheus2mqtt/prometheus"
 	"github.com/prometheus/client_golang/api"
 	promHttp "github.com/prometheus/client_golang/api/prometheus/v1"
@@ -30,22 +31,26 @@ func main() {
 	flag.IntVar(&intervalInSeconds, "interval", 5, "Scraping interval in seconds")
 	flag.Parse()
 
+	logger := log.New(os.Stderr, "", log.LstdFlags)
 	log.Printf("Starting scraping for %d metric(s) every %d seconds\n", len(strings.Split(metricsToScrape, ",")), intervalInSeconds)
 
 	transport := defaultTransport(intervalInSeconds)
-	prometheusAPI, err := getPrometheusClient(prometheusUrl, transport)
+	prometheusAPI, err := getPrometheusClient(logger, prometheusUrl, transport)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
 	client := prometheus.NewClient(prometheusAPI)
 	ticker := time.NewTicker(time.Second * time.Duration(intervalInSeconds))
 
+	mqttConfig := mqtt.NewClientOptions()
+	mqtt.NewClient(mqttConfig)
+
 	for {
 		select {
 		case <-ticker.C:
-			tick(ctx, client, intervalInSeconds, metricsToScrape)
+			tick(ctx, logger, client, intervalInSeconds, metricsToScrape)
 		case <-ctx.Done():
-			log.Printf("Gracefully stopping..")
+			log.Printf("Received signal to stop")
 			os.Exit(0)
 		}
 	}
@@ -66,19 +71,19 @@ func defaultTransport(intervalInSeconds int) *http.Transport {
 	}
 }
 
-func getPrometheusClient(url string, trip http.RoundTripper) (v1.API, error) {
+func getPrometheusClient(logger *log.Logger, url string, trip http.RoundTripper) (v1.API, error) {
 	promClient, err := api.NewClient(api.Config{
 		Address:      url,
 		RoundTripper: trip,
 	})
 	if err != nil {
-		log.Fatal(err.Error())
+		logger.Fatal(err.Error())
 	}
 
 	return promHttp.NewAPI(promClient), nil
 }
 
-func tick(ctx context.Context, client prometheus.Client, intervalInSeconds int, metricsToScrape string) {
+func tick(ctx context.Context, logger *log.Logger, client prometheus.Client, intervalInSeconds int, metricsToScrape string) {
 	defer func() {
 		e := recover()
 		if e != nil {
@@ -90,19 +95,20 @@ func tick(ctx context.Context, client prometheus.Client, intervalInSeconds int, 
 		ctx,
 		(time.Duration(intervalInSeconds)*time.Second)-(100*time.Millisecond),
 	)
+
 	metrics, err := client.Scrape(
 		ctxTimeout,
 		strings.Split(metricsToScrape, ",")...,
 	)
 	cancel()
 	if err == context.DeadlineExceeded {
-		log.Printf("Scraping metrics exceeded timeout\n")
+		logger.Printf("Scraping metrics exceeded timeout\n")
 	} else if err != nil {
-		log.Printf("Error when scraping for metrics: %s\n", err.Error())
+		logger.Printf("Error when scraping for metrics: %s\n", err.Error())
 	}
 
 	for n, m := range metrics {
 		// @todo send to mqtt
-		log.Printf("Metric \t%s\t has value:\t%.0f\tcollected at:\t%s\n", n, m.Value, m.Time.String())
+		logger.Printf("Metric \t%s\t has value:\t%.0f\tcollected at:\t%s\n", n, m.Value, m.Time.String())
 	}
 }
