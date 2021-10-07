@@ -2,12 +2,16 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"flag"
 	"log"
+	"math/rand"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,6 +23,7 @@ import (
 )
 
 func main() {
+	logger := log.New(os.Stderr, "", log.LstdFlags)
 	ctx, terminate := signal.NotifyContext(context.Background(), os.Kill, os.Interrupt)
 	defer terminate()
 
@@ -26,34 +31,88 @@ func main() {
 	var intervalInSeconds int
 
 	flag.StringVar(&prometheusUrl, "prometheus", "http://localhost:9090", "Full Prometheus URL including protocol and port")
-	flag.StringVar(&mqttUrl, "mqtt", "http://localhost:9090", "Full MQTT Broker URL including protocol and port")
+	flag.StringVar(&mqttUrl, "mqtt", "mqtt://localhost:9090", "Full MQTT Broker URL including protocol and port")
 	flag.StringVar(&metricsToScrape, "metrics", "up", "Metrics to scrape split by comma")
 	flag.IntVar(&intervalInSeconds, "interval", 5, "Scraping interval in seconds")
 	flag.Parse()
 
-	logger := log.New(os.Stderr, "", log.LstdFlags)
-	log.Printf("Starting scraping for %d metric(s) every %d seconds\n", len(strings.Split(metricsToScrape, ",")), intervalInSeconds)
-
 	transport := defaultTransport(intervalInSeconds)
 	prometheusAPI, err := getPrometheusClient(logger, prometheusUrl, transport)
 	if err != nil {
-		log.Fatal(err.Error())
+		logger.Fatal(err.Error())
 	}
-	client := prometheus.NewClient(prometheusAPI)
+	prometheusClient := prometheus.NewClient(prometheusAPI)
 	ticker := time.NewTicker(time.Second * time.Duration(intervalInSeconds))
 
-	mqttConfig := mqtt.NewClientOptions()
-	mqtt.NewClient(mqttConfig)
+	mqttClient := mqtt.NewClient(mqttClientOptions(mqttUrl, logger))
+	t := mqttClient.Connect()
+
+	select {
+	case <-t.Done():
+		if t.Error() != nil {
+			logger.Fatalf("Couldn't connect to MQTT broker: %v", t.Error())
+		}
+	case <-ctx.Done():
+		logger.Printf("Received signal to stop")
+		os.Exit(0)
+	}
+
+	if !mqttClient.IsConnected() {
+		logger.Fatalf("couldn't connect to mqtt")
+	} else {
+		logger.Println("Connected to MQTT broker")
+	}
+
+	logger.Printf(
+		"Starting scraping for %d metric(s) every %d seconds\n",
+		len(strings.Split(metricsToScrape, ",")),
+		intervalInSeconds,
+	)
 
 	for {
 		select {
 		case <-ticker.C:
-			tick(ctx, logger, client, intervalInSeconds, metricsToScrape)
+			tick(ctx, logger, prometheusClient, mqttClient, intervalInSeconds, metricsToScrape)
 		case <-ctx.Done():
-			log.Printf("Received signal to stop")
+			logger.Printf("Received signal to stop")
+			mqttClient.Disconnect(50)
 			os.Exit(0)
 		}
 	}
+}
+
+func mqttClientOptions(mqttUrl string, logger *log.Logger) *mqtt.ClientOptions {
+	randomId := rand.New(rand.NewSource(time.Now().UnixNano())).Intn(9999)
+
+	mqttServers := make([]*url.URL, 0)
+	serverUrl, err := url.Parse(mqttUrl)
+	if err != nil {
+		logger.Fatal(err.Error())
+	}
+	clientId := "prometheus2mqtt." + strconv.Itoa(randomId)
+	logger.Printf("ClientID: %s\n", clientId)
+	config := mqtt.NewClientOptions()
+	config.
+		SetClientID(clientId).
+		SetResumeSubs(true).
+		SetTLSConfig(&tls.Config{InsecureSkipVerify: true}).
+		SetConnectRetry(true).
+		SetConnectRetryInterval(time.Second * 5).
+		SetConnectTimeout(time.Second * 2)
+
+	config.Servers = append(mqttServers, serverUrl)
+	config.OnConnectAttempt = func(url *url.URL, tlsCfg *tls.Config) *tls.Config {
+		logger.Printf("Attempting to connect with MQTT broker: %s\n", url.String())
+		return tlsCfg
+	}
+	config.OnConnect = func(_ mqtt.Client) {
+		logger.Println("Connected with MQTT broker")
+	}
+	config.OnReconnecting = func(_ mqtt.Client, _ *mqtt.ClientOptions) {
+		logger.Println("Reconnecting with MQTT broker...")
+	}
+
+	return config
 }
 
 func defaultTransport(intervalInSeconds int) *http.Transport {
@@ -83,7 +142,14 @@ func getPrometheusClient(logger *log.Logger, url string, trip http.RoundTripper)
 	return promHttp.NewAPI(promClient), nil
 }
 
-func tick(ctx context.Context, logger *log.Logger, client prometheus.Client, intervalInSeconds int, metricsToScrape string) {
+func tick(
+	ctx context.Context,
+	logger *log.Logger,
+	prometheusClient prometheus.Client,
+	mqttClient mqtt.Client,
+	intervalInSeconds int,
+	metricsToScrape string,
+) {
 	defer func() {
 		e := recover()
 		if e != nil {
@@ -96,7 +162,7 @@ func tick(ctx context.Context, logger *log.Logger, client prometheus.Client, int
 		(time.Duration(intervalInSeconds)*time.Second)-(100*time.Millisecond),
 	)
 
-	metrics, err := client.Scrape(
+	metrics, err := prometheusClient.Scrape(
 		ctxTimeout,
 		strings.Split(metricsToScrape, ",")...,
 	)
@@ -108,7 +174,12 @@ func tick(ctx context.Context, logger *log.Logger, client prometheus.Client, int
 	}
 
 	for n, m := range metrics {
-		// @todo send to mqtt
-		logger.Printf("Metric \t%s\t has value:\t%.0f\tcollected at:\t%s\n", n, m.Value, m.Time.String())
+		t := mqttClient.Publish("prometheus2mqtt/"+n, 0, true, m.Value)
+		if !t.WaitTimeout(time.Millisecond * 250) {
+			logger.Printf("Publishing metric %s took over 250ms, continuing...\n", n)
+			continue
+		}
+
+		logger.Printf("Metric %s (value: %.2f) was send to MQTT\n", n)
 	}
 }
