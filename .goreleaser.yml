@@ -3,13 +3,15 @@ before:
   hooks:
     - go mod tidy
 builds:
-  - env:
+  - id: p2m
+    env:
       - CGO_ENABLED=0
     goos:
       - linux
       - windows
       - darwin
-  - env:
+  - id: p2m_rasp
+    env:
       - CGO_ENABLED=0
     goos:
       - linux
