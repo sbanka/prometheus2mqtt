@@ -40,32 +40,10 @@ changelog:
       - '^test:'
 dockers:
   - id: rasp
-    goos: linux
-    goarch: arm
-    goarm: 7
     dockerfile: Dockerfile
     image_templates:
-      - "krzysztofgzocha/prometheus2mqtt:latest-arm"
-      - "krzysztofgzocha/prometheus2mqtt:{{ .Tag }}-arm"
-    build_flag_templates:
-      - "--platform=linux/arm"
-    extra_files: # no idea WTF I need to add this..
-      - go.mod
-      - go.sum
-      - main.go
-      - config/
-      - prometheus/
-      - ticker/
-      - vendor/
-  - id: linux
-    goos: linux
-    goarch: arm64
-    dockerfile: Dockerfile
-    image_templates:
-      - "krzysztofgzocha/prometheus2mqtt:latest-arm64"
-      - "krzysztofgzocha/prometheus2mqtt:{{ .Tag }}-arm64"
-    build_flag_templates:
-      - "--platform=linux/arm64"
+      - "krzysztofgzocha/prometheus2mqtt:latest"
+      - "krzysztofgzocha/prometheus2mqtt:{{ .Tag }}"
     extra_files: # no idea WTF I need to add this..
       - go.mod
       - go.sum
