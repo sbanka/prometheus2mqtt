@@ -43,9 +43,18 @@ dockers:
     goos: linux
     goarch: arm
     goarm: 7
+    dockerfile: Dockerfile
     image_templates:
-      - "krzysztofgzocha/prometheus2mqtt:latest"
-      - "krzysztofgzocha/prometheus2mqtt:{{ .Tag }}"
+      - "krzysztofgzocha/prometheus2mqtt:latest-arm"
+      - "krzysztofgzocha/prometheus2mqtt:{{ .Tag }}-arm"
+    extra_files: # no idea WTF I need to add this..
+      - go.mod
+      - go.sum
+      - main.go
+      - config/
+      - prometheus/
+      - ticker/
+      - vendor/
 release:
   github:
     owner: krzysztofgzocha

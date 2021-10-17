@@ -1,7 +1,7 @@
 FROM golang:latest as builder
 
 WORKDIR /app
-COPY . .
+COPY . /app
 RUN CGO_ENABLED=0 go build -o prometheus2mqtt .
 
 FROM alpine:latest
