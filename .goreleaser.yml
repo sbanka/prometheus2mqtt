@@ -57,5 +57,5 @@ dockers:
       - vendor/
 release:
   github:
-    owner: krzysztofgzocha
+    owner: krzysztof-gzocha
     name: prometheus2mqtt
