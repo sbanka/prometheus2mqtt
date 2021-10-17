@@ -27,6 +27,7 @@ archives:
       windows: Windows
       386: i386
       amd64: x86_64
+      arm: rasp
 checksum:
   name_template: 'checksums.txt'
 snapshot:
@@ -37,3 +38,15 @@ changelog:
     exclude:
       - '^docs:'
       - '^test:'
+dockers:
+  - id: rasp
+    goos: linux
+    goarch: arm
+    goarm: 7
+    image_templates:
+      - "krzysztofgzocha/prometheus2mqtt:latest"
+      - "krzysztofgzocha/prometheus2mqtt:{{ .Tag }}"
+release:
+  github:
+    owner: krzysztofgzocha
+    name: prometheus2mqtt
