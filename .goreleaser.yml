@@ -3,14 +3,15 @@ before:
   hooks:
     - go mod tidy
 builds:
-  - id: p2m
+  - id: linux
     env:
       - CGO_ENABLED=0
     goos:
       - linux
-      - windows
-      - darwin
-  - id: p2m_rasp
+    goarch:
+      - amd64
+
+  - id: rasp
     env:
       - CGO_ENABLED=0
     goos:
@@ -19,7 +20,7 @@ builds:
       - 7
       - 6
     goarch:
-      - arm
+      - arm64
 archives:
   - replacements:
       darwin: Darwin
@@ -39,11 +40,12 @@ changelog:
       - '^docs:'
       - '^test:'
 dockers:
-  - id: rasp
+  - id: linux
     dockerfile: Dockerfile
+    goos: linux
+    goarch: amd64
     image_templates:
-      - "krzysztofgzocha/prometheus2mqtt:latest"
-      - "krzysztofgzocha/prometheus2mqtt:{{ .Tag }}"
+      - "krzysztofgzocha/prometheus2mqtt:{{ .Tag }}-amd64"
     extra_files: # no idea WTF I need to add this..
       - go.mod
       - go.sum
@@ -52,6 +54,32 @@ dockers:
       - prometheus/
       - ticker/
       - vendor/
+    build_flag_templates:
+      - "--platform=linux/amd64"
+
+#  - id: rasp
+#    goos: linux
+#    goarch: arm64
+#    goarm: 7
+#    dockerfile: Dockerfile
+#    image_templates:
+#      - "krzysztofgzocha/prometheus2mqtt:{{ .Tag }}-arm64"
+#    extra_files: # no idea WTF I need to add this..
+#      - go.mod
+#      - go.sum
+#      - main.go
+#      - config/
+#      - prometheus/
+#      - ticker/
+#      - vendor/
+#    build_flag_templates:
+#      - "--platform=linux/arm64/v8"
+#
+#docker_manifests:
+#  - name_template: "krzysztofgzocha/prometheus2mqtt:{{ .Tag }}"
+#    image_templates:
+#      - "krzysztofgzocha/prometheus2mqtt:{{ .Tag }}-arm64"
+#      - "krzysztofgzocha/prometheus2mqtt:{{ .Tag }}-amd64"
 release:
   github:
     owner: krzysztof-gzocha
