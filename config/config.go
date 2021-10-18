@@ -54,7 +54,7 @@ func (m Mqtt) GetUser() string {
 		panic(err.Error())
 	}
 
-	return string(user)
+	return string(user[0 : len(user)-1])
 }
 
 func (m Mqtt) GetPassword() string {
@@ -67,7 +67,7 @@ func (m Mqtt) GetPassword() string {
 		panic(err.Error())
 	}
 
-	return string(password)
+	return string(password[0 : len(password)-1])
 }
 
 func Load() (Config, error) {
