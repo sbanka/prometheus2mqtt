@@ -35,6 +35,7 @@ func NewTicker(
 }
 
 func (t *Ticker) Start(ctx context.Context) {
+	t.logger.Printf("Starting scraping for %d metric(s) every %s\n", len(t.cfg.Metrics), t.cfg.Interval.String())
 	ticker := time.NewTicker(t.cfg.Interval)
 
 	for {
@@ -68,28 +69,32 @@ func (t *Ticker) tick(ctx context.Context) {
 	}
 
 	for name, value := range metrics {
-		topic := t.cfg.MqttBroker.PublishTopicPrefix + "/" + name
-		token := t.mqtt.Publish(
-			topic,
-			t.cfg.MqttBroker.Qos,
-			t.cfg.MqttBroker.RetainMessages,
-			value,
-		)
-
-		if !token.WaitTimeout(t.cfg.MqttBroker.PublishTimeout) {
-			t.logger.Printf(
-				"Publishing metric %s took over %s, continuing without it...\n",
-				name,
-				t.cfg.MqttBroker.PublishTimeout.String(),
-			)
-			continue
-		}
-
-		if token.Error() != nil {
-			t.logger.Printf("There was an error sending the message: %v", token.Error())
-			continue
-		}
-
-		t.logger.Printf("Metric %s was send to MQTT topic %s with value:\t%s\n", name, topic, value)
+		t.publish(name, value)
 	}
+}
+
+func (t *Ticker) publish(name, value string) {
+	topic := t.cfg.MqttBroker.PublishTopicPrefix + "/" + name
+	token := t.mqtt.Publish(
+		topic,
+		t.cfg.MqttBroker.Qos,
+		t.cfg.MqttBroker.RetainMessages,
+		value,
+	)
+
+	if !token.WaitTimeout(t.cfg.MqttBroker.PublishTimeout) {
+		t.logger.Printf(
+			"Publishing metric %s took over %s, continuing without it...\n",
+			name,
+			t.cfg.MqttBroker.PublishTimeout.String(),
+		)
+		return
+	}
+
+	if token.Error() != nil {
+		t.logger.Printf("There was an error sending the message: %v\n", token.Error())
+		return
+	}
+
+	t.logger.Printf("Sending \t%s\t to \t%s\n", value, topic)
 }

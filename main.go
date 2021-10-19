@@ -53,14 +53,14 @@ func main() {
 	}
 
 	scrapingTicker := ticker.NewTicker(cfg, prometheusClient, mqttClient, logger)
-	logger.Printf("Starting scraping for %d metric(s) every %s\n", len(cfg.Metrics), cfg.Interval.String())
-
 	scrapingTicker.Start(ctx)
-
 	mqttClient.Disconnect(50)
 }
 
 func mqttClientOptions(mqttConfig config.Mqtt, logger *log.Logger) *mqtt.ClientOptions {
+	mqtt.CRITICAL = logger
+	mqtt.ERROR = logger
+
 	clientId := mqttConfig.ClientID
 	if clientId == "" {
 		randomId := rand.New(rand.NewSource(time.Now().UnixNano())).Intn(99999)
