@@ -6,7 +6,7 @@ I was trying to build small dashboard on my phone, which would pull the metrics 
 I've noticed that I already have a lot of metrics stored in prometheus, so I wanted to re-use them.
 
 ## How?
-I'm using `[kelseyhightower/envconfig](https://github.com/kelseyhightower/envconfig)`, so you can configure all the parameters via environment variables and run it via:
+I'm using [`kelseyhightower/envconfig`](https://github.com/kelseyhightower/envconfig), so you can configure all the parameters via environment variables and run it via:
 ```
 go run main.go
 ```
@@ -39,4 +39,11 @@ type Mqtt struct {
 	Qos                byte          `envconfig:"qos" default:"1"`
 }
 ```
-To configure MQTT user for example use `P2M_MQTT_USER` environment variable
+To configure MQTT user for example use `P2M_MQTT_USER` environment variable.
+
+### Metrics format
+In order to configure metrics we have to specify 2 value for each of them: 
+- `alias`: easy to read name, which will be sent to MQTT broker and could be picked up in the topic `p2m/<alias>`
+- `query`: used to query Prometheus
+
+Format of metrics flag is `alias1:query1,alias2:query2`.
