@@ -2,6 +2,7 @@ package publisher
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"hash/crc32"
@@ -150,5 +151,5 @@ func shortHash(input string) string {
 	h := crc32.NewIEEE() //nolint:gosec
 	_, _ = h.Write([]byte(input))
 
-	return string(h.Sum(nil))
+	return hex.EncodeToString(h.Sum(nil))
 }
