@@ -5,8 +5,8 @@ import (
 	"log"
 	"time"
 
-	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/krzysztof-gzocha/prometheus2mqtt/config"
+	"github.com/krzysztof-gzocha/prometheus2mqtt/publisher"
 )
 
 type Scraper interface {
@@ -14,23 +14,23 @@ type Scraper interface {
 }
 
 type Ticker struct {
-	cfg     config.Config
-	scraper Scraper
-	mqtt    mqtt.Client
-	logger  *log.Logger
+	cfg       config.Config
+	scraper   Scraper
+	publisher publisher.Publisher
+	logger    *log.Logger
 }
 
 func NewTicker(
 	cfg config.Config,
 	prometheus Scraper,
-	mqtt mqtt.Client,
+	publisher publisher.Publisher,
 	logger *log.Logger,
 ) *Ticker {
 	return &Ticker{
-		cfg:     cfg,
-		scraper: prometheus,
-		mqtt:    mqtt,
-		logger:  logger,
+		cfg:       cfg,
+		scraper:   prometheus,
+		publisher: publisher,
+		logger:    logger,
 	}
 }
 
@@ -69,32 +69,9 @@ func (t *Ticker) tick(ctx context.Context) {
 	}
 
 	for name, value := range metrics {
-		t.publish(name, value)
+		err := t.publisher.Publish(ctx, name, value)
+		if err != nil {
+			t.logger.Printf("Error occurred when publishing metric %s: %s", name, err.Error())
+		}
 	}
-}
-
-func (t *Ticker) publish(name, value string) {
-	topic := t.cfg.MqttBroker.PublishTopicPrefix + "/" + name
-	token := t.mqtt.Publish(
-		topic,
-		t.cfg.MqttBroker.Qos,
-		t.cfg.MqttBroker.RetainMessages,
-		value,
-	)
-
-	if !token.WaitTimeout(t.cfg.MqttBroker.PublishTimeout) {
-		t.logger.Printf(
-			"Publishing metric %s took over %s, continuing without it...\n",
-			name,
-			t.cfg.MqttBroker.PublishTimeout.String(),
-		)
-		return
-	}
-
-	if token.Error() != nil {
-		t.logger.Printf("There was an error sending the message: %v\n", token.Error())
-		return
-	}
-
-	t.logger.Printf("Sending \t%s\t to \t%s\n", value, topic)
 }

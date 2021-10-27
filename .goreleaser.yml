@@ -10,6 +10,8 @@ builds:
       - linux
     goarch:
       - amd64
+    ldflags:
+      - -s -w -X github.com/krzysztof-gzocha/prometheus2mqtt/config.Version={{.Version}}
 
   - id: rasp
     env:
@@ -21,6 +23,9 @@ builds:
       - 6
     goarch:
       - arm64
+    ldflags:
+      - -s -w -X github.com/krzysztof-gzocha/prometheus2mqtt/config.Version={{.Version}}
+
 archives:
   - replacements:
       darwin: Darwin
@@ -52,10 +57,12 @@ dockers:
       - main.go
       - config/
       - prometheus/
+      - publisher/
       - ticker/
       - vendor/
     build_flag_templates:
       - "--platform=linux/amd64"
+      - "--build-arg=VERSION={{.Version}}"
 
 #  - id: rasp
 #    goos: linux

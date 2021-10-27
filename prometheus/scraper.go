@@ -20,7 +20,7 @@ func NewScraper(prometheus v1.API, logger *log.Logger) Scraper {
 }
 
 func (s Scraper) Scrape(ctx context.Context, metrics map[string]string) (map[string]string, error) {
-	result := make(map[string]string, 0)
+	result := make(map[string]string)
 
 	for name, query := range metrics {
 		val, _, err := s.prometheusClient.Query(ctx, query, time.Time{})

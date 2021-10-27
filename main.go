@@ -16,6 +16,7 @@ import (
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/krzysztof-gzocha/prometheus2mqtt/config"
 	"github.com/krzysztof-gzocha/prometheus2mqtt/prometheus"
+	"github.com/krzysztof-gzocha/prometheus2mqtt/publisher"
 	"github.com/krzysztof-gzocha/prometheus2mqtt/ticker"
 	"github.com/prometheus/client_golang/api"
 	promHttp "github.com/prometheus/client_golang/api/prometheus/v1"
@@ -24,6 +25,7 @@ import (
 
 func main() {
 	logger := log.New(os.Stderr, "", log.LstdFlags)
+	logger.Printf("Starting Prometheus2MQTT (ver: %s)\n", config.Version)
 	ctx, terminate := signal.NotifyContext(context.Background(), os.Kill, os.Interrupt)
 	defer terminate()
 
@@ -35,7 +37,7 @@ func main() {
 	transport := defaultTransport(cfg.Interval)
 	prometheusAPI := getPrometheusClient(logger, cfg.PrometheusUrl, transport)
 	prometheusClient := prometheus.NewScraper(prometheusAPI, logger)
-	mqttClient := mqtt.NewClient(mqttClientOptions(cfg.MqttBroker, logger))
+	mqttClient := mqtt.NewClient(mqttClientOptions(cfg.Mqtt, logger))
 	t := mqttClient.Connect()
 
 	select {
@@ -52,7 +54,13 @@ func main() {
 		logger.Fatalf("couldn't connect to mqtt")
 	}
 
-	scrapingTicker := ticker.NewTicker(cfg, prometheusClient, mqttClient, logger)
+	var mqttPub publisher.Publisher
+	mqttPub = publisher.NewSimple(cfg.Mqtt, mqttClient, logger)
+	if cfg.Mqtt.HAPublisher {
+		mqttPub = publisher.NewHomeAssistant(cfg.Mqtt, mqttClient, logger)
+	}
+
+	scrapingTicker := ticker.NewTicker(cfg, prometheusClient, mqttPub, logger)
 	scrapingTicker.Start(ctx)
 	mqttClient.Disconnect(50)
 }
@@ -96,7 +104,7 @@ func mqttClientOptions(mqttConfig config.Mqtt, logger *log.Logger) *mqtt.ClientO
 		logger.Println("Reconnecting with MQTT broker...")
 	}
 	cfg.OnConnectionLost = func(_ mqtt.Client, err error) {
-		logger.Println("[ERROR] Connection to MQTT broker was lost due to: %+v", err)
+		logger.Printf("[ERROR] Connection to MQTT broker was lost due to: %+v\n", err)
 	}
 
 	return cfg
