@@ -19,8 +19,8 @@ go build . && ./prometheus2mqtt
 ```go
 type Config struct {
 	PrometheusUrl string            `envconfig:"prometheus_url" required:"true"`
-	MqttBroker    Mqtt              `envconfig:"mqtt"`
-	Metrics       map[string]string `envconfig:"metrics" default:"up_prometheus:up{job='prometheus'}"`
+	Mqtt          Mqtt              `envconfig:"mqtt"`
+	Metrics       map[string]string `envconfig:"metrics" default:"disks_flushes:node_disk_flush_requests_total{device='sda'}"`
 	Interval      time.Duration     `envconfig:"interval" default:"15s"`
 	ScrapeTimeout time.Duration     `envconfig:"scrape_timeout" default:"3s"`
 }
@@ -33,10 +33,13 @@ type Mqtt struct {
 	Servers            []string      `envconfig:"servers" required:"true"`
 	InsecureSkipVerify bool          `envconfig:"insecure_skip_verify" default:"false"`
 	PublishTopicPrefix string        `envconfig:"publish_topic_prefix" default:"p2m"`
-	ClientID           string        `envconfig:"client_id"`
+	ClientID           string        `envconfig:"client_id" default:"Prometheus2MQTT"`
 	RetainMessages     bool          `envconfig:"retain_messages" default:"true"`
 	PublishTimeout     time.Duration `envconfig:"publish_timeout" default:"5s"`
 	Qos                byte          `envconfig:"qos" default:"1"`
+	// HAPublisher defines if MQTT publishing format should be compatible with HomeAssistant
+	HAPublisher     bool   `envconfig:"ha_publisher" default:"true"`
+	DiscoveryPrefix string `envconfig:"discovery_prefix" default:"homeassistant"`
 }
 ```
 To configure MQTT user for example use `P2M_MQTT_USER` environment variable.
