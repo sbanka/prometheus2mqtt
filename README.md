@@ -1,4 +1,4 @@
-# Prometheus-to-MQTT
+# Prometheus-to-MQTT [![Docker Pulls](https://img.shields.io/docker/pulls/krzysztofgzocha/prometheus2mqtt)](https://hub.docker.com/r/krzysztofgzocha/prometheus2mqtt)
 Scraping metrics from Prometheus and sending them to MQTT broker.
 
 ## Why?
@@ -6,47 +6,42 @@ I was trying to build small dashboard on my phone, which would pull the metrics 
 I've noticed that I already have a lot of metrics stored in prometheus, so I wanted to re-use them.
 
 ## How?
-I'm using [`kelseyhightower/envconfig`](https://github.com/kelseyhightower/envconfig), so you can configure all the parameters via environment variables and run it via:
+Edit config.yaml file, build the program and run it:
+```bash
+CGO_ENABLED=0 go build -o prometheus2mqtt . && ./prometheus2mqtt 
 ```
-go run main.go
-```
-or build it and run:
-```
-go build . && ./prometheus2mqtt
-```
+
+### Docker
+...or use this docker image: https://hub.docker.com/r/krzysztofgzocha/prometheus2mqtt
+Currently just a few OS/arch are ready and the build is not yet automated.
 
 ## Config options
-```go
-type Config struct {
-	PrometheusUrl string            `envconfig:"prometheus_url" required:"true"`
-	Mqtt          Mqtt              `envconfig:"mqtt"`
-	Metrics       map[string]string `envconfig:"metrics" default:"disks_flushes:node_disk_flush_requests_total{device='sda'}"`
-	Interval      time.Duration     `envconfig:"interval" default:"15s"`
-	ScrapeTimeout time.Duration     `envconfig:"scrape_timeout" default:"3s"`
-}
-
-type Mqtt struct {
-	User               string        `envconfig:"user"`
-	Password           string        `envconfig:"password"`
-	UserFile           string        `envconfig:"user_file"`
-	PasswordFile       string        `envconfig:"password_file"`
-	Servers            []string      `envconfig:"servers" required:"true"`
-	InsecureSkipVerify bool          `envconfig:"insecure_skip_verify" default:"false"`
-	PublishTopicPrefix string        `envconfig:"publish_topic_prefix" default:"p2m"`
-	ClientID           string        `envconfig:"client_id" default:"Prometheus2MQTT"`
-	RetainMessages     bool          `envconfig:"retain_messages" default:"true"`
-	PublishTimeout     time.Duration `envconfig:"publish_timeout" default:"5s"`
-	Qos                byte          `envconfig:"qos" default:"1"`
-	// HAPublisher defines if MQTT publishing format should be compatible with HomeAssistant
-	HAPublisher     bool   `envconfig:"ha_publisher" default:"true"`
-	DiscoveryPrefix string `envconfig:"discovery_prefix" default:"homeassistant"`
-}
+```yaml
+prometheus_url: http://prometheus:9090
+interval: 15s
+scrape_timeout: 3s
+mqtt:
+  user: admin
+# user_file: /var/secret/user # Useful when using docker secrets 
+  password: admin
+# password_file: /var/secret/user # Useful when using docker secrets
+  servers:
+    - mqtt://mosquitto:1883
+  insecure_skip_verify: true
+  publish_topic_prefix: p2m
+  client_id: Prometheus2MQTT
+  retain_messages: true
+  publish_timeout: 5s
+  qos: 1
+  ha_publisher: true # Should it be compatible with HomeAssistant MQTT discovery?
+  discovery_prefix: homeassistant
+metrics:
+  - name: "Health: Prometheus"
+    query: up{job='prometheus'}
 ```
-To configure MQTT user for example use `P2M_MQTT_USER` environment variable.
 
 ### Metrics format
 In order to configure metrics we have to specify 2 value for each of them: 
-- `alias`: easy to read name, which will be sent to MQTT broker and could be picked up in the topic `p2m/<alias>`
+- `name`: easy to read name, which will be sent to MQTT broker and could be picked up in the topic `p2m/<name>`. 
+All non-alfanumeric characters will be replaced with `_` when constructing MQTT topic.
 - `query`: used to query Prometheus
-
-Format of metrics flag is `alias1:query1,alias2:query2`.

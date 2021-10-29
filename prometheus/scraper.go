@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/krzysztof-gzocha/prometheus2mqtt/config"
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
 )
@@ -19,11 +20,11 @@ func NewScraper(prometheus v1.API, logger *log.Logger) Scraper {
 	return Scraper{prometheusClient: prometheus, logger: logger}
 }
 
-func (s Scraper) Scrape(ctx context.Context, metrics map[string]string) (map[string]string, error) {
+func (s Scraper) Scrape(ctx context.Context, metrics ...config.Metric) (map[string]string, error) {
 	result := make(map[string]string)
 
-	for name, query := range metrics {
-		val, _, err := s.prometheusClient.Query(ctx, query, time.Time{})
+	for _, metric := range metrics {
+		val, _, err := s.prometheusClient.Query(ctx, metric.Query, time.Time{})
 		if err != nil {
 			return result, err
 		}
@@ -34,7 +35,7 @@ func (s Scraper) Scrape(ctx context.Context, metrics map[string]string) (map[str
 			if len(v) == 0 {
 				continue
 			}
-			result[name] = strconv.FormatFloat(
+			result[metric.Name] = strconv.FormatFloat(
 				float64(v[0].Value),
 				'f',
 				-1,
@@ -43,7 +44,7 @@ func (s Scraper) Scrape(ctx context.Context, metrics map[string]string) (map[str
 		default:
 			s.logger.Printf(
 				"Metric %s is type %T, not model.Vector. Skipping it..",
-				name,
+				metric.Name,
 				val,
 			)
 		}

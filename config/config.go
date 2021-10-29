@@ -5,34 +5,39 @@ import (
 	"os"
 	"time"
 
-	"github.com/kelseyhightower/envconfig"
+	"github.com/spf13/viper"
 )
 
 var Version string
 
+type Metric struct {
+	Name  string `mapstructure:"name"`
+	Query string `mapstructure:"query"`
+}
+
 type Config struct {
-	PrometheusUrl string            `envconfig:"prometheus_url" required:"true"`
-	Mqtt          Mqtt              `envconfig:"mqtt"`
-	Metrics       map[string]string `envconfig:"metrics" default:"disks_flushes:node_disk_flush_requests_total{device='sda'}"`
-	Interval      time.Duration     `envconfig:"interval" default:"15s"`
-	ScrapeTimeout time.Duration     `envconfig:"scrape_timeout" default:"3s"`
+	PrometheusUrl string        `mapstructure:"prometheus_url" envconfig:"prometheus_url" required:"true"`
+	Mqtt          Mqtt          `mapstructure:"mqtt" envconfig:"mqtt"`
+	Metrics       []Metric      `mapstructure:"metrics" envconfig:"metrics" default:"disks_flushes:node_disk_flush_requests_total{device='sda'}"`
+	Interval      time.Duration `mapstructure:"interval" envconfig:"interval" default:"15s"`
+	ScrapeTimeout time.Duration `mapstructure:"scrape_timeout" envconfig:"scrape_timeout" default:"3s"`
 }
 
 type Mqtt struct {
-	User               string        `envconfig:"user"`
-	Password           string        `envconfig:"password"`
-	UserFile           string        `envconfig:"user_file"`
-	PasswordFile       string        `envconfig:"password_file"`
-	Servers            []string      `envconfig:"servers" required:"true"`
-	InsecureSkipVerify bool          `envconfig:"insecure_skip_verify" default:"false"`
-	PublishTopicPrefix string        `envconfig:"publish_topic_prefix" default:"p2m"`
-	ClientID           string        `envconfig:"client_id" default:"Prometheus2MQTT"`
-	RetainMessages     bool          `envconfig:"retain_messages" default:"true"`
-	PublishTimeout     time.Duration `envconfig:"publish_timeout" default:"5s"`
-	Qos                byte          `envconfig:"qos" default:"1"`
+	User               string        `mapstructure:"user" envconfig:"user"`
+	Password           string        `mapstructure:"password" envconfig:"password"`
+	UserFile           string        `mapstructure:"user_file" envconfig:"user_file"`
+	PasswordFile       string        `mapstructure:"password_file" envconfig:"password_file"`
+	Servers            []string      `mapstructure:"servers" envconfig:"servers" required:"true"`
+	InsecureSkipVerify bool          `mapstructure:"insecure_skip_verify" envconfig:"insecure_skip_verify" default:"false"`
+	PublishTopicPrefix string        `mapstructure:"publish_topic_prefix" envconfig:"publish_topic_prefix" default:"p2m"`
+	ClientID           string        `mapstructure:"client_id" envconfig:"client_id" default:"Prometheus2MQTT"`
+	RetainMessages     bool          `mapstructure:"retain_messages" envconfig:"retain_messages" default:"true"`
+	PublishTimeout     time.Duration `mapstructure:"publish_timeout" envconfig:"publish_timeout" default:"5s"`
+	Qos                byte          `mapstructure:"qos" envconfig:"qos" default:"1"`
 	// HAPublisher defines if MQTT publishing format should be compatible with HomeAssistant
-	HAPublisher     bool   `envconfig:"ha_publisher" default:"true"`
-	DiscoveryPrefix string `envconfig:"discovery_prefix" default:"homeassistant"`
+	HAPublisher     bool   `mapstructure:"ha_publisher" envconfig:"ha_publisher" default:"true"`
+	DiscoveryPrefix string `mapstructure:"discovery_prefix" envconfig:"discovery_prefix" default:"homeassistant"`
 }
 
 func (m Mqtt) ServersUrls() ([]*url.URL, error) {
@@ -75,9 +80,29 @@ func (m Mqtt) GetPassword() string {
 	return string(password[0 : len(password)-1])
 }
 
-func Load() (Config, error) {
+func Load(file string) (Config, error) {
 	c := Config{}
-	err := envconfig.Process("p2m", &c)
+
+	viper.SetConfigFile(file)
+	viper.SetEnvPrefix("P2M")
+	viper.AutomaticEnv()
+
+	viper.SetDefault("interval", time.Second*15)
+	viper.SetDefault("scrape_timeout", time.Second*3)
+	viper.SetDefault("mqtt.public_topic_prefix", "p2m")
+	viper.SetDefault("mqtt.client_id", "Prometheus2MQTT")
+	viper.SetDefault("mqtt.retain_messages", true)
+	viper.SetDefault("mqtt.publish_timeout", time.Second*5)
+	viper.SetDefault("mqtt.qos", 1)
+	viper.SetDefault("mqtt.ha_publisher", true)
+	viper.SetDefault("mqtt.discovery_prefix", "homeassistant")
+
+	err := viper.ReadInConfig()
+	if err != nil {
+		return c, err
+	}
+
+	err = viper.Unmarshal(&c)
 
 	return c, err
 }

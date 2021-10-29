@@ -1,0 +1,19 @@
+prometheus_url: http://prometheus:9090
+#interval: 15s
+#scrape_timeout: 3s
+mqtt:
+  user: admin
+  password: admin
+  servers:
+    - mqtt://mosquitto:1883
+  insecure_skip_verify: true
+#  publish_topic_prefix: p2m
+#  client_id: Prometheus2MQTT
+#  retain_messages: true
+#  publish_timeout: 5s
+#  qos: 1
+#  ha_publisher: true
+#  discovery_prefix: homeassistant
+metrics:
+  - name: Traefik up?
+    query: up{job='traefik'}

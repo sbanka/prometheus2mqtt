@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"flag"
 	"log"
 	"math/rand"
 	"net"
@@ -26,10 +27,14 @@ import (
 func main() {
 	logger := log.New(os.Stderr, "", log.LstdFlags)
 	logger.Printf("Starting Prometheus2MQTT (ver: %s)\n", config.Version)
-	ctx, terminate := signal.NotifyContext(context.Background(), os.Kill, os.Interrupt)
-	defer terminate()
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Kill, os.Interrupt)
+	defer cancel()
 
-	cfg, err := config.Load()
+	var configFile string
+	flag.StringVar(&configFile, "config", "./config.yaml", "Full path of the config file")
+	flag.Parse()
+
+	cfg, err := config.Load(configFile)
 	if err != nil {
 		logger.Fatalf("Could not load the configuration: %s", err.Error())
 	}

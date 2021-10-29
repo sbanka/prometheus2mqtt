@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"hash/crc32"
 	"log"
+	"regexp"
 	"strings"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
@@ -30,6 +31,7 @@ type haDevice struct {
 }
 
 type HomeAssistant struct {
+	nonAlfaChars      *regexp.Regexp
 	cfg               config.Mqtt
 	mqtt              mqtt.Client
 	logger            *log.Logger
@@ -42,6 +44,7 @@ func NewHomeAssistant(
 	logger *log.Logger,
 ) *HomeAssistant {
 	return &HomeAssistant{
+		nonAlfaChars:      regexp.MustCompile("[^a-zA-Z0-9]"),
 		cfg:               cfg,
 		mqtt:              mqtt,
 		logger:            logger,
@@ -112,7 +115,7 @@ func (h *HomeAssistant) stateTopic(name string) string {
 	return fmt.Sprintf(
 		"%s/sensor/%s/state",
 		h.cfg.DiscoveryPrefix,
-		h.stripSlashes(h.cfg.ClientID+"_"+name),
+		h.stripNonAlfa(h.sensorName(name)),
 	)
 }
 
@@ -120,12 +123,12 @@ func (h *HomeAssistant) configTopic(name string) string {
 	return fmt.Sprintf(
 		"%s/sensor/%s/config",
 		h.cfg.DiscoveryPrefix,
-		h.stripSlashes(h.cfg.ClientID+"_"+name),
+		h.stripNonAlfa(h.sensorName(name)),
 	)
 }
 
-func (h *HomeAssistant) stripSlashes(name string) string {
-	return strings.Replace(name, "/", "_", -1)
+func (h *HomeAssistant) stripNonAlfa(name string) string {
+	return strings.Trim(h.nonAlfaChars.ReplaceAllString(name, "_"), "_")
 }
 
 func (h *HomeAssistant) sendMsg(ctx context.Context, topic, msg string) error {

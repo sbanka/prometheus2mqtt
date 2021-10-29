@@ -10,7 +10,7 @@ import (
 )
 
 type Scraper interface {
-	Scrape(ctx context.Context, metrics map[string]string) (map[string]string, error)
+	Scrape(ctx context.Context, metric ...config.Metric) (map[string]string, error)
 }
 
 type Ticker struct {
@@ -59,7 +59,7 @@ func (t *Ticker) tick(ctx context.Context) {
 	}()
 
 	ctxTimeout, cancel := context.WithTimeout(ctx, t.cfg.ScrapeTimeout)
-	metrics, err := t.scraper.Scrape(ctxTimeout, t.cfg.Metrics)
+	metrics, err := t.scraper.Scrape(ctxTimeout, t.cfg.Metrics...)
 	cancel()
 
 	if err == context.DeadlineExceeded {
