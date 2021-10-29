@@ -1,4 +1,4 @@
-# Prometheus-to-MQTT [![Docker Pulls](https://img.shields.io/docker/pulls/krzysztofgzocha/prometheus2mqtt)](https://hub.docker.com/r/krzysztofgzocha/prometheus2mqtt)
+# Prometheus-to-MQTT [![Docker Pulls](https://img.shields.io/docker/pulls/krzysztofgzocha/prometheus2mqtt)](https://hub.docker.com/r/krzysztofgzocha/prometheus2mqtt) [![golangci-lint](https://github.com/krzysztof-gzocha/prometheus2mqtt/actions/workflows/lint.yml/badge.svg?branch=master)](https://github.com/krzysztof-gzocha/prometheus2mqtt/actions/workflows/lint.yml)
 Scraping metrics from Prometheus and sending them to MQTT broker.
 
 ## Why?
