@@ -28,4 +28,4 @@ jobs:
       run: go test -v ./...
 
     - name: Debug
-      run: ls -la
+      run: ls -laR
