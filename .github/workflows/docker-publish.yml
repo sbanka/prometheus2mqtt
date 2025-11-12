@@ -1,4 +1,4 @@
-name: Docker
+name: Docker image
 
 # This workflow uses actions that are not certified by GitHub.
 # They are provided by a third-party and are governed by
@@ -6,21 +6,22 @@ name: Docker
 # documentation.
 
 on:
-  schedule:
-    - cron: '23 13 * * *'
+  # schedule:
+  #   - cron: '23 13 * * *'
   push:
     branches: [ "master" ]
     # Publish semver tags as releases.
     tags: [ 'v*.*.*' ]
-  pull_request:
-    branches: [ "master" ]
+  # pull_request:
+  #   branches: [ "master" ]
+  #   on:
+  workflow_dispatch:
 
 env:
   # Use docker.io for Docker Hub if empty
   REGISTRY: ghcr.io
   # github.repository as <account>/<repo>
   IMAGE_NAME: ${{ github.repository }}
-
 
 jobs:
   build:
